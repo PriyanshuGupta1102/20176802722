@@ -1,28 +1,31 @@
-// Logging Middleware/index.js
 
-const fs = require('fs');
-const path = require('path');
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 
-// Define the path for the log file
-const logFilePath = path.join(__dirname, 'activity.log');
+// IMPORTANT: Adjust the path to your pre-built logging middleware
+const loggingMiddleware = require('../Logging Middleware/index.js'); 
+const urlController = require('./controllers/urlController');
 
-const loggingMiddleware = (req, res, next) => {
-    // Construct the log message
-    const logMessage = `${new Date().toISOString()} | ${req.method} | ${req.originalUrl} | ${req.ip}\n`;
+const app = express();
+const PORT = process.env.PORT || 5000;
 
-    // Log to the console for immediate visibility during development
-    console.log(logMessage.trim());
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('MongoDB connected...'))
+    .catch(err => console.error(err));
 
-    // Append the message to the log file
-    fs.appendFile(logFilePath, logMessage, (err) => {
-        if (err) {
-            console.error('Failed to write to log file.', err);
-        }
-    });
+// Middlewares
+app.use(cors());
+app.use(express.json());
+app.use(loggingMiddleware); // Use your custom logger
 
-    // VERY IMPORTANT: Call next() to pass control to the next middleware in the stack
-    next();
-};
+// API Routes
+app.post('/shorturls', urlController.createShortUrl);
+app.get('/shorturls/:shortcode', urlController.getUrlStats);
 
-// THE FIX: Make sure you are exporting the function itself, not an object.
-module.exports = loggingMiddleware;
+// Redirection Route (must be last)
+app.get('/:shortcode', urlController.redirectToOriginalUrl);
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
