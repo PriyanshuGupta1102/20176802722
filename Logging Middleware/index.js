@@ -1,27 +1,45 @@
-
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 
-// Define the path for the log file
+// Define the path for the local log file
 const logFilePath = path.join(__dirname, 'activity.log');
 
-const loggingMiddleware = (req, res, next) => {
-    // Construct the log message
-    const logMessage = `${new Date().toISOString()} | ${req.method} | ${req.originalUrl} | ${req.ip}\n`;
+// Remote logging config
+const remoteLoggingUrl = 'http://20.244.56.144/evaluation-service/log';
+const accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJNYXBDbGFpbXMiOnsiYXVkIjoiaHR0cDovLzIwLjI0NC41Ni4xNDQvZXZhbHVhdGlvbi1zZXJ2aWNlIiwiZW1haWwiOiJwZzAwMDA3NDJAZ21haWwuY29tIiwiZXhwIjoxNzUxOTUxNDI1LCJpYXQiOjE3NTE5NTA1MjUsImlzcyI6IkFmZm9yZCBNZWRpY2FsIFRlY2hub2xvZ2llcyBQcml2YXRlIExpbWl0ZWQiLCJqdGkiOiIyMWU0OGQ1ZS1kYzY2LTQwZDctYWUxZi05MWVmNTE1NWFlMmYiLCJsb2NhbGUiOiJlbi1JTiIsIm5hbWUiOiJwcml5YW5zaHUgZ3VwdGEiLCJzdWIiOiIyZjVlNTMxNy0wMWQ0LTQ2ZmUtYjdmYS00MTY1OTE3OWNmZTAifSwiZW1haWwiOiJwZzAwMDA3NDJAZ21haWwuY29tIiwibmFtZSI6InByaXlhbnNodSBndXB0YSIsInJvbGxObyI6IjIwMTc2ODAyNzIyIiwiYWNjZXNzQ29kZSI6IlZQcHNtVCIsImNsaWVudElEIjoiMmY1ZTUzMTctMDFkNC00NmZlLWI3ZmEtNDE2NTkxNzljZmUwIiwiY2xpZW50U2VjcmV0IjoieGRrUVJOU2RreHZBV1JOZyJ9.-j44Ue56BCBkf_jFgncz_K69vrQRG8ssIeoeHJx56D8';
 
-    // Log to the console for immediate visibility during development
+// Middleware function
+const loggingMiddleware = (req, res, next) => {
+    const timestamp = new Date().toISOString();
+    const logMessage = `${timestamp} | ${req.method} | ${req.originalUrl} | ${req.ip}\n`;
+
+    // Log to console
     console.log(logMessage.trim());
 
-    // Append the message to the log file
+    // Append to local file
     fs.appendFile(logFilePath, logMessage, (err) => {
         if (err) {
             console.error('Failed to write to log file.', err);
         }
     });
 
-    // VERY IMPORTANT: Call next() to pass control to the next middleware in the stack
+    // Send log to remote server
+    axios.post(remoteLoggingUrl, {
+        timestamp,
+        method: req.method,
+        url: req.originalUrl,
+        ip: req.ip,
+    }, {
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        }
+    }).catch(err => {
+        console.error('Failed to log to remote server:', err.response ? err.response.data : err.message);
+    });
+
     next();
 };
 
-// THE FIX: Make sure you are exporting the function itself, not an object.
 module.exports = loggingMiddleware;
